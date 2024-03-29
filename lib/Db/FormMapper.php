@@ -29,6 +29,7 @@ namespace OCA\Forms\Db;
 use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
+use OCP\Share\IShare;
 
 /**
  * @extends QBMapper<Form>
@@ -95,16 +96,53 @@ class FormMapper extends QBMapper {
 	}
 
 	/**
+	 * Get forms shared with the user
+	 * @param string $userId The user ID
+	 * @param string[] $groups IDs of groups the user is memeber of
+	 * @param string[] $teams IDs of teams the user is memeber of
 	 * @return Form[]
 	 */
-	public function findAllSharedForms(string $currentUser): array {
+	public function findSharedForms(string $userId, $publicForms = true, array $groups = [], array $teams = []): array {
 		$qb = $this->db->getQueryBuilder();
+
+		$memberships = $qb->expr()->orX();
+		// share type user and share with current user
+		$memberships->add(
+			$qb->expr()->andX(
+				$qb->expr()->eq('shares.share_type', $qb->createNamedParameter(IShare::TYPE_USER)),
+				$qb->expr()->eq('shares.share_with', $qb->createNamedParameter($userId)),
+			),
+		);
+		// share type group and one of the user groups
+		if (!empty($groups)) {
+			$memberships->add(
+				$qb->expr()->andX(
+					$qb->expr()->eq('shares.share_type', $qb->createNamedParameter(IShare::TYPE_GROUP)),
+					$qb->expr()->in('shares.share_with', $groups),
+				),
+			);
+		}
+		// share type team and one of the user teams
+		if (!empty($teams)) {
+			$memberships->add(
+				$qb->expr()->andX(
+					$qb->expr()->eq('shares.share_type', $qb->createNamedParameter(IShare::TYPE_CIRCLE)),
+					$qb->expr()->in('shares.share_with', $teams),
+				),
+			);
+		}
+		// public forms
+		if ($publicForms) {
+			$memberships->add($qb->expr()->like('forms.access_json', $qb->createNamedParameter('%"showToAllUsers":true%')));
+		}
 
 		$qb->select('forms.*')
 			->from($this->getTableName(), 'forms')
 			->leftJoin('forms', 'forms_v2_shares', 'shares', $qb->expr()->eq('forms.id', 'shares.form_id'))
-			->where($qb->expr()->eq('shares.share_with', $qb->createNamedParameter($currentUser)))
-			->orWhere($qb->expr()->like('forms.access_json', $qb->createNamedParameter('%"showToAllUsers":true%')))
+			// user is memeber of
+			->where($memberships)
+			// ensure not to include owned forms
+			->andWhere($qb->expr()->neq('forms.owner_id', $qb->createNamedParameter($userId)))
 			//Last updated forms first, then newest forms first
 			->addOrderBy('forms.last_updated', 'DESC')
 			->addOrderBy('forms.created', 'DESC');

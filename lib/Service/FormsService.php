@@ -383,37 +383,34 @@ class FormsService {
 	}
 
 	/**
-	 * Is the form shown on sidebar to the user.
+	 * Get all forms shared to the user
+	 */
+	public function getSharedForms(IUser $user): array {
+		$groups = $this->groupManager->getUserGroupIds($user);
+		$teams = $this->circlesService->getUserTeamIds($user->getUID());
+		$forms = $this->formMapper->findSharedForms(
+			$user->getUID(),
+			$this->configService->getAllowPermitAll(),
+			$groups,
+			$teams,
+		);
+		$forms = array_filter($forms, fn (Form $form): bool => $this->shouldShowFormAsShared($form));
+		return $forms;
+	}
+
+	/**
+	 * Is the shared form shown on sidebar to the user.
 	 *
 	 * @param Form $form
 	 * @return bool
 	 */
-	public function isSharedFormShown(Form $form): bool {
-		// Dont show here to owner, as its in the owned list anyways.
-		if ($form->getOwnerId() === $this->currentUser->getUID()) {
-			return false;
-		}
-
+	private function shouldShowFormAsShared(Form $form): bool {
 		// Dont show expired forms if user isn't allowed to see results.
 		if ($this->hasFormExpired($form) && !$this->canSeeResults($form)) {
 			return false;
 		}
 
-		$access = $form->getAccess();
-		// Shown if permitall and showntoall are both set.
-		if ($access['permitAllUsers'] &&
-			$access['showToAllUsers'] &&
-			$this->configService->getAllowPermitAll()) {
-			return true;
-		}
-
-		// Shown if user in List of Shared Users/Groups
-		if ($this->isSharedToUser($form->getId())) {
-			return true;
-		}
-
-		// No Reason found to show form.
-		return false;
+		return true;
 	}
 
 	/**
