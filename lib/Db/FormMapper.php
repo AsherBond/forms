@@ -115,7 +115,7 @@ class FormMapper extends QBMapper {
 			// permitted access
 			->where($access)
 			// ensure not to include owned forms
-			->andWhere($qb->expr()->neq('owner_id', $qb->createNamedParameter($userId)))
+			->andWhere($qb->expr()->neq('owner_id', $qb->createNamedParameter($userId, IQueryBuilder::PARAM_STR)))
 			//Last updated forms first, then newest forms first
 			->addOrderBy('last_updated', 'DESC')
 			->addOrderBy('created', 'DESC');
@@ -138,7 +138,7 @@ class FormMapper extends QBMapper {
 		$memberships->add(
 			$qb->expr()->andX(
 				$qb->expr()->eq('shares.share_type', $qb->createNamedParameter(IShare::TYPE_USER)),
-				$qb->expr()->eq('shares.share_with', $qb->createNamedParameter($userId)),
+				$qb->expr()->eq('shares.share_with', $qb->createNamedParameter($userId, IQueryBuilder::PARAM_STR)),
 			),
 		);
 		// share type group and one of the user groups
@@ -146,7 +146,7 @@ class FormMapper extends QBMapper {
 			$memberships->add(
 				$qb->expr()->andX(
 					$qb->expr()->eq('shares.share_type', $qb->createNamedParameter(IShare::TYPE_GROUP)),
-					$qb->expr()->in('shares.share_with', $groups),
+					$qb->expr()->in('shares.share_with', $qb->createNamedParameter($groups, IQueryBuilder::PARAM_STR_ARRAY)),
 				),
 			);
 		}
@@ -155,7 +155,7 @@ class FormMapper extends QBMapper {
 			$memberships->add(
 				$qb->expr()->andX(
 					$qb->expr()->eq('shares.share_type', $qb->createNamedParameter(IShare::TYPE_CIRCLE)),
-					$qb->expr()->in('shares.share_with', $teams),
+					$qb->expr()->in('shares.share_with', $qb->createNamedParameter($teams, IQueryBuilder::PARAM_STR_ARRAY)),
 				),
 			);
 		}
@@ -166,7 +166,7 @@ class FormMapper extends QBMapper {
 			// user is memeber of
 			->where($memberships)
 			// ensure not to include owned forms
-			->andWhere($qb->expr()->neq('forms.owner_id', $qb->createNamedParameter($userId)))
+			->andWhere($qb->expr()->neq('forms.owner_id', $qb->createNamedParameter($userId, IQueryBuilder::PARAM_STR)))
 			//Last updated forms first, then newest forms first
 			->addOrderBy('forms.last_updated', 'DESC')
 			->addOrderBy('forms.created', 'DESC');
