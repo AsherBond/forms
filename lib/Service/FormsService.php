@@ -390,10 +390,16 @@ class FormsService {
 		$teams = $this->circlesService->getUserTeamIds($user->getUID());
 		$forms = $this->formMapper->findSharedForms(
 			$user->getUID(),
-			$this->configService->getAllowPermitAll(),
 			$groups,
 			$teams,
 		);
+
+		$publicForms = [];
+		if ($this->configService->getAllowPermitAll()) {
+			$publicForms = $this->formMapper->findPublicForms($this->currentUser->getUID());
+		}
+
+		$forms = array_merge($forms, $publicForms);
 		$forms = array_filter($forms, fn (Form $form): bool => $this->shouldShowFormAsShared($form));
 		return $forms;
 	}

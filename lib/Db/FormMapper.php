@@ -96,13 +96,41 @@ class FormMapper extends QBMapper {
 	}
 
 	/**
+	 * Get public shared forms (shared to all users)
+	 * @param string $userId User ID to filter forms owned by the user
+	 * @param bool $filterShown Set to false to also include forms shared but not visible on sidebar
+	 * @return Form[]
+	 */
+	public function findPublicForms(string $userId, bool $filterShown = true): array {
+		$qb = $this->db->getQueryBuilder();
+
+		if ($filterShown) {
+			$access = $qb->expr()->like('access_json', $qb->createNamedParameter('%"showToAllUsers":true%'));
+		} else {
+			$access = $qb->expr()->like('access_json', $qb->createNamedParameter('%"permitAllUsers":true%'));
+		}
+
+		$qb->select('*')
+			->from($this->getTableName())
+			// permitted access
+			->where($access)
+			// ensure not to include owned forms
+			->andWhere($qb->expr()->neq('owner_id', $qb->createNamedParameter($userId)))
+			//Last updated forms first, then newest forms first
+			->addOrderBy('last_updated', 'DESC')
+			->addOrderBy('created', 'DESC');
+
+		return $this->findEntities($qb);
+	}
+
+	/**
 	 * Get forms shared with the user
 	 * @param string $userId The user ID
 	 * @param string[] $groups IDs of groups the user is memeber of
 	 * @param string[] $teams IDs of teams the user is memeber of
 	 * @return Form[]
 	 */
-	public function findSharedForms(string $userId, $publicForms = true, array $groups = [], array $teams = []): array {
+	public function findSharedForms(string $userId, array $groups = [], array $teams = []): array {
 		$qb = $this->db->getQueryBuilder();
 
 		$memberships = $qb->expr()->orX();
@@ -131,14 +159,10 @@ class FormMapper extends QBMapper {
 				),
 			);
 		}
-		// public forms
-		if ($publicForms) {
-			$memberships->add($qb->expr()->like('forms.access_json', $qb->createNamedParameter('%"showToAllUsers":true%')));
-		}
 
 		$qb->select('forms.*')
 			->from($this->getTableName(), 'forms')
-			->leftJoin('forms', 'forms_v2_shares', 'shares', $qb->expr()->eq('forms.id', 'shares.form_id'))
+			->innerJoin('forms', 'forms_v2_shares', 'shares', $qb->expr()->eq('forms.id', 'shares.form_id'))
 			// user is memeber of
 			->where($memberships)
 			// ensure not to include owned forms
