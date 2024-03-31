@@ -400,7 +400,7 @@ class FormsService {
 		}
 
 		$forms = array_merge($forms, $publicForms);
-		$forms = array_filter($forms, fn (Form $form): bool => $this->shouldShowFormAsShared($form));
+		$forms = array_filter($forms, fn (Form $form): bool => $this->isSharedFormShown($form));
 		return $forms;
 	}
 
@@ -410,7 +410,7 @@ class FormsService {
 	 * @param Form $form
 	 * @return bool
 	 */
-	private function shouldShowFormAsShared(Form $form): bool {
+	private function isSharedFormShown(Form $form): bool {
 		// Dont show expired forms if user isn't allowed to see results.
 		if ($this->hasFormExpired($form) && !$this->canSeeResults($form)) {
 			return false;
