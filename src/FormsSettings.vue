@@ -7,9 +7,9 @@
 	<div>
 		<NcSettingsSection :name="t('forms', 'Form creation')">
 			<NcCheckboxRadioSwitch
-				ref="switchRestrictCreation"
 				v-model="appConfig.restrictCreation"
 				class="forms-settings__creation__switch"
+				:loading="loading.restrictCreation"
 				type="switch"
 				@update:modelValue="onRestrictCreationChange">
 				{{ t('forms', 'Restrict form creation to selected groups') }}
@@ -26,22 +26,22 @@
 		</NcSettingsSection>
 		<NcSettingsSection :name="t('forms', 'Form sharing')">
 			<NcCheckboxRadioSwitch
-				ref="switchAllowPublicLink"
 				v-model="appConfig.allowPublicLink"
+				:loading="loading.allowPublicLink"
 				type="switch"
 				@update:modelValue="onAllowPublicLinkChange">
 				{{ t('forms', 'Allow sharing by link') }}
 			</NcCheckboxRadioSwitch>
 			<NcCheckboxRadioSwitch
-				ref="switchAllowPermitAll"
 				v-model="appConfig.allowPermitAll"
+				:loading="loading.allowPermitAll"
 				type="switch"
 				@update:modelValue="onAllowPermitAllChange">
 				{{ t('forms', 'Allow sharing to all logged in accounts') }}
 			</NcCheckboxRadioSwitch>
 			<NcCheckboxRadioSwitch
-				ref="switchAllowShowToAll"
 				v-model="appConfig.allowShowToAll"
+				:loading="loading.allowShowToAll"
 				type="switch"
 				@update:modelValue="onAllowShowToAllChange">
 				{{
@@ -78,6 +78,7 @@ export default {
 		return {
 			appConfig: loadState(appName, 'appConfig'),
 			availableGroups: loadState(appName, 'availableGroups'),
+			loading: {},
 		}
 	},
 
@@ -92,41 +93,36 @@ export default {
 		 * @param {boolean|Array} newVal The resp. new Value to store.
 		 */
 		async onRestrictCreationChange(newVal) {
-			const el = this.$refs.switchRestrictCreation
-			el.loading = true
+			this.loading.restrictCreation = true
 			await this.saveAppConfig('restrictCreation', newVal)
-			el.loading = false
+			this.loading.restrictCreation = false
 		},
 
 		async onCreationAllowedGroupsChange(newVal) {
-			const el = this.$refs.switchRestrictCreation
-			el.loading = true
+			this.loading.creationAllowedGroups = true
 			await this.saveAppConfig(
 				'creationAllowedGroups',
 				newVal.map((group) => group.groupId),
 			)
-			el.loading = false
+			this.loading.creationAllowedGroups = false
 		},
 
 		async onAllowPublicLinkChange(newVal) {
-			const el = this.$refs.switchAllowPublicLink
-			el.loading = true
+			this.loading.allowPublicLink = true
 			await this.saveAppConfig('allowPublicLink', newVal)
-			el.loading = false
+			this.loading.allowPublicLink = false
 		},
 
 		async onAllowPermitAllChange(newVal) {
-			const el = this.$refs.switchAllowPermitAll
-			el.loading = true
+			this.loading.allowPermitAll = true
 			await this.saveAppConfig('allowPermitAll', newVal)
-			el.loading = false
+			this.loading.allowPermitAll = false
 		},
 
 		async onAllowShowToAllChange(newVal) {
-			const el = this.$refs.switchAllowShowToAll
-			el.loading = true
+			this.loading.allowShowToAll = true
 			await this.saveAppConfig('allowShowToAll', newVal)
-			el.loading = false
+			this.loading.allowShowToAll = false
 		},
 
 		/**
