@@ -9,6 +9,7 @@ namespace OCA\Forms\Tests\Unit\Service;
 
 use OCA\Forms\Service\ConfigService;
 
+use OCP\AppFramework\Services\IAppConfig;
 use OCP\IConfig;
 use OCP\IGroup;
 use OCP\IGroupManager;
@@ -27,6 +28,9 @@ class ConfigServiceTest extends TestCase {
 	/** @var IConfig|MockObject */
 	private $config;
 
+	/** @var IAppConfig|MockObject */
+	private $appConfig;
+
 	/** @var IGroupManager|MockObject */
 	private $groupManager;
 
@@ -37,6 +41,7 @@ class ConfigServiceTest extends TestCase {
 		parent::setUp();
 
 		$this->config = $this->createMock(IConfig::class);
+		$this->appConfig = $this->createMock(IAppConfig::class);
 		$this->groupManager = $this->createMock(IGroupManager::class);
 		$userSession = $this->createMock(IUserSession::class);
 
@@ -51,6 +56,7 @@ class ConfigServiceTest extends TestCase {
 		$this->configService = new ConfigService(
 			'forms',
 			$this->config,
+			$this->appConfig,
 			$this->groupManager,
 			$userSession
 		);
@@ -65,6 +71,8 @@ class ConfigServiceTest extends TestCase {
 					'allowShowToAll' => 'false',
 					'creationAllowedGroups' => '["group1", "group2", "nonExisting"]',
 					'restrictCreation' => 'true',
+					'allowConfirmationEmail' => 'false',
+					'confirmationEmailRateLimit' => '5',
 				],
 				'groupDisplayNames' => [
 					'group1' => 'Group No. 1',
@@ -85,7 +93,9 @@ class ConfigServiceTest extends TestCase {
 						]
 					],
 					'restrictCreation' => true,
-
+					'allowConfirmationEmail' => false,
+					'confirmationEmailRateLimit' => 5,
+					'isMailConfigured' => true,
 					'canCreateForms' => false
 				]
 			]
@@ -103,9 +113,13 @@ class ConfigServiceTest extends TestCase {
 		$this->config->expects($this->any())
 			->method('getAppValue')
 			->will($this->returnCallback(function ($appName, $configKey, $defaultVal) use ($strConfig) {
-				return $strConfig[$configKey];
+				return $strConfig[$configKey] ?? $defaultVal;
 			}));
 
+		$this->config->expects($this->any())
+			->method('getSystemValue')
+			->with('mail_from_address', '')
+			->willReturn('no-reply@example.com');
 
 		// Mock Group formatting
 		$this->groupManager->expects($this->any())
@@ -127,6 +141,13 @@ class ConfigServiceTest extends TestCase {
 			->with($this->currentUser)
 			->willReturn([]);
 
+		$this->appConfig->expects($this->any())
+			->method('getAppValueBool')
+			->willReturn($expected['allowConfirmationEmail']);
+		$this->appConfig->expects($this->any())
+			->method('getAppValueInt')
+			->willReturn($expected['confirmationEmailRateLimit']);
+
 		$this->assertEquals($expected, $this->configService->getAppConfig());
 	}
 
@@ -139,6 +160,9 @@ class ConfigServiceTest extends TestCase {
 					'allowShowToAll' => true,
 					'creationAllowedGroups' => [],
 					'restrictCreation' => false,
+					'allowConfirmationEmail' => false,
+					'confirmationEmailRateLimit' => 3,
+					'isMailConfigured' => false,
 					'canCreateForms' => true
 				]
 			]
@@ -156,6 +180,18 @@ class ConfigServiceTest extends TestCase {
 			->will($this->returnCallback(function ($appName, $configKey, $defaultVal) {
 				return $defaultVal;
 			}));
+
+		$this->config->expects($this->any())
+			->method('getSystemValue')
+			->with('mail_from_address', '')
+			->willReturn('');
+
+		$this->appConfig->expects($this->any())
+			->method('getAppValueBool')
+			->willReturn($expected['allowConfirmationEmail']);
+		$this->appConfig->expects($this->any())
+			->method('getAppValueInt')
+			->willReturn($expected['confirmationEmailRateLimit']);
 
 		$this->assertEquals($expected, $this->configService->getAppConfig());
 	}

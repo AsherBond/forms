@@ -61,6 +61,10 @@ class ConfigController extends ApiController {
 			return new DataResponse('Unknown appConfig key: ' . $configKey, Http::STATUS_BAD_REQUEST);
 		}
 
+		if ($configKey === Constants::CONFIG_KEY_ALLOWCONFIRMATIONEMAIL && $configValue === true && !$this->configService->isMailConfigured()) {
+			return new DataResponse('Mail server is not configured', Http::STATUS_BAD_REQUEST);
+		}
+
 		// Set on DB
 		$this->config->setAppValue($this->appName, $configKey, json_encode($configValue));
 
