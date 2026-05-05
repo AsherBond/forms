@@ -100,4 +100,19 @@ class Question extends Entity {
 			'extraSettings' => $this->getExtraSettings(),
 		];
 	}
+
+	/**
+	 * Check if the question is a short text question with email validation.
+	 */
+	public function isEmailType(?string $type = null, ?array $extraSettings = null): bool {
+		return self::checkEmailType(
+			$type ?? $this->getType(),
+			$extraSettings ?? $this->getExtraSettings()
+		);
+	}
+
+	public static function checkEmailType(string $type, array $extraSettings): bool {
+		return $type === \OCA\Forms\Constants::ANSWER_TYPE_SHORT
+			&& ($extraSettings['validationType'] ?? null) === 'email';
+	}
 }

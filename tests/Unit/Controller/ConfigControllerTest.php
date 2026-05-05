@@ -116,4 +116,21 @@ class ConfigControllerTest extends TestCase {
 
 		$this->assertEquals(new DataResponse('Unknown appConfig key: someUnknownKey', 400), $this->configController->updateAppConfig('someUnknownKey', 'storeThisValue!'));
 	}
+
+	public function testUpdateAppConfigRejectsConfirmationEmailWhenMailIsNotConfigured() {
+		$this->logger->expects($this->once())
+			->method('debug');
+
+		$this->configService->expects($this->once())
+			->method('isMailConfigured')
+			->willReturn(false);
+
+		$this->config->expects($this->never())
+			->method('setAppValue');
+
+		$this->assertEquals(
+			new DataResponse('Mail server is not configured', 400),
+			$this->configController->updateAppConfig('allowConfirmationEmail', true)
+		);
+	}
 }

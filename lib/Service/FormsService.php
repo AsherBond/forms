@@ -67,6 +67,7 @@ class FormsService {
 		private IL10N $l10n,
 		private LoggerInterface $logger,
 		private IEventDispatcher $eventDispatcher,
+		private ConfirmationEmailService $confirmationEmailService,
 	) {
 		$this->currentUser = $userSession->getUser();
 	}
@@ -739,6 +740,8 @@ class FormsService {
 		}
 
 		$this->eventDispatcher->dispatchTyped(new FormSubmittedEvent($form, $submission));
+
+		$this->confirmationEmailService->send($form, $submission);
 	}
 
 	/**
@@ -1015,4 +1018,5 @@ class FormsService {
 	private static function normalizeFileName(string $fileName): string {
 		return trim(str_replace(Constants::FILENAME_INVALID_CHARS, '-', $fileName));
 	}
+
 }

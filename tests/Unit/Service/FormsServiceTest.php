@@ -44,6 +44,7 @@ use OCA\Forms\Db\Submission;
 use OCA\Forms\Db\SubmissionMapper;
 use OCA\Forms\Service\CirclesService;
 use OCA\Forms\Service\ConfigService;
+use OCA\Forms\Service\ConfirmationEmailService;
 use OCA\Forms\Service\FormsService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\EventDispatcher\IEventDispatcher;
@@ -111,6 +112,9 @@ class FormsServiceTest extends TestCase {
 	/** @var LoggerInterface|MockObject */
 	private $logger;
 
+	/** @var ConfirmationEmailService|MockObject */
+	private $confirmationEmailService;
+
 	public function setUp(): void {
 		parent::setUp();
 		$this->activityManager = $this->createMock(ActivityManager::class);
@@ -121,6 +125,7 @@ class FormsServiceTest extends TestCase {
 		$this->submissionMapper = $this->createMock(SubmissionMapper::class);
 		$this->configService = $this->createMock(ConfigService::class);
 		$this->logger = $this->createMock(LoggerInterface::class);
+		$this->confirmationEmailService = $this->createMock(ConfirmationEmailService::class);
 		$this->groupManager = $this->createMock(IGroupManager::class);
 		$this->userManager = $this->createMock(IUserManager::class);
 		$this->secureRandom = $this->createMock(ISecureRandom::class);
@@ -159,8 +164,33 @@ class FormsServiceTest extends TestCase {
 			$this->l10n,
 			$this->logger,
 			\OCP\Server::get(IEventDispatcher::class),
-			$this->logger,
+			$this->confirmationEmailService,
 		);
+	}
+
+	private function createFormsServiceWithEventDispatcher(IEventDispatcher $eventDispatcher): FormsService {
+		return $this->getMockBuilder(FormsService::class)
+			->onlyMethods(['getShares'])
+			->setConstructorArgs([
+				$this->createMock(IUserSession::class),
+				$this->activityManager,
+				$this->formMapper,
+				$this->optionMapper,
+				$this->questionMapper,
+				$this->shareMapper,
+				$this->submissionMapper,
+				$this->configService,
+				$this->groupManager,
+				$this->userManager,
+				$this->secureRandom,
+				$this->circlesService,
+				$this->storage,
+				$this->l10n,
+				$this->logger,
+				$eventDispatcher,
+				$this->confirmationEmailService,
+			])
+			->getMock();
 	}
 
 	public function testGenerateFormHash() {
@@ -256,6 +286,10 @@ class FormsServiceTest extends TestCase {
 				'lockedUntil' => null,
 				'maxSubmissions' => null,
 				'isMaxSubmissionsReached' => false,
+				'confirmationEmailEnabled' => false,
+				'confirmationEmailSubject' => null,
+				'confirmationEmailBody' => null,
+				'confirmationEmailQuestionId' => null,
 			]]
 		];
 	}
@@ -473,6 +507,10 @@ class FormsServiceTest extends TestCase {
 				'lockedUntil' => null,
 				'maxSubmissions' => null,
 				'isMaxSubmissionsReached' => false,
+				'confirmationEmailEnabled' => false,
+				'confirmationEmailSubject' => null,
+				'confirmationEmailBody' => null,
+				'confirmationEmailQuestionId' => null,
 			]]
 		];
 	}
@@ -640,7 +678,7 @@ class FormsServiceTest extends TestCase {
 			$this->l10n,
 			$this->logger,
 			\OCP\Server::get(IEventDispatcher::class),
-			$this->logger,
+			$this->confirmationEmailService,
 		);
 
 		$form = new Form();
@@ -865,7 +903,7 @@ class FormsServiceTest extends TestCase {
 			$this->l10n,
 			$this->logger,
 			\OCP\Server::get(IEventDispatcher::class),
-			$this->logger,
+			$this->confirmationEmailService,
 		);
 
 		$this->assertEquals(true, $formsService->canSubmit($form));
@@ -973,7 +1011,7 @@ class FormsServiceTest extends TestCase {
 			$this->l10n,
 			$this->logger,
 			\OCP\Server::get(IEventDispatcher::class),
-			$this->logger,
+			$this->confirmationEmailService,
 		);
 
 		$form = new Form();
@@ -1196,7 +1234,7 @@ class FormsServiceTest extends TestCase {
 				$this->l10n,
 				$this->logger,
 				$eventDispatcher,
-				$this->logger,
+				$this->confirmationEmailService,
 			])
 			->getMock();
 
@@ -1212,6 +1250,8 @@ class FormsServiceTest extends TestCase {
 			->method('publishNewSharedSubmission');
 
 		$eventDispatcher->expects($this->exactly(1))->method('dispatchTyped')->withAnyParameters();
+
+		$this->confirmationEmailService->expects($this->once())->method('send')->with($form, $submission);
 
 		$formsService->notifyNewSubmission($form, $submission);
 	}
@@ -1553,9 +1593,10 @@ class FormsServiceTest extends TestCase {
 		$this->assertEmpty($result);
 	}
 
-	private function createQuestionEntity(array $data): Question {
+	private function createQuestionEntity(array $data): MockObject {
 		$questionEntity = $this->createMock(Question::class);
 		$questionEntity->method('read')->willReturn($data);
 		return $questionEntity;
 	}
+
 }

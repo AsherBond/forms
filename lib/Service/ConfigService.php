@@ -10,6 +10,7 @@ namespace OCA\Forms\Service;
 
 use OCA\Forms\Constants;
 
+use OCP\AppFramework\Services\IAppConfig;
 use OCP\IConfig;
 use OCP\IGroup;
 use OCP\IGroupManager;
@@ -22,6 +23,7 @@ class ConfigService {
 	public function __construct(
 		protected string $appName,
 		private IConfig $config,
+		private IAppConfig $appConfig,
 		private IGroupManager $groupManager,
 		IUserSession $userSession,
 	) {
@@ -50,6 +52,18 @@ class ConfigService {
 		return json_decode($this->config->getAppValue($this->appName, Constants::CONFIG_KEY_RESTRICTCREATION, 'false'));
 	}
 
+	public function getAllowConfirmationEmail(): bool {
+		return $this->appConfig->getAppValueBool(Constants::CONFIG_KEY_ALLOWCONFIRMATIONEMAIL, false);
+	}
+
+	public function isMailConfigured(): bool {
+		return $this->config->getSystemValue('mail_from_address', '') !== '';
+	}
+
+	public function getConfirmationEmailRateLimit(): int {
+		return $this->appConfig->getAppValueInt(Constants::CONFIG_KEY_CONFIRMATIONEMAILRATELIMIT, 3);
+	}
+
 	/**
 	 * Provide the full AppConfig
 	 */
@@ -60,6 +74,9 @@ class ConfigService {
 			Constants::CONFIG_KEY_ALLOWSHOWTOALL => $this->getAllowShowToAll(),
 			Constants::CONFIG_KEY_CREATIONALLOWEDGROUPS => $this->getCreationAllowedGroups(),
 			Constants::CONFIG_KEY_RESTRICTCREATION => $this->getRestrictCreation(),
+			Constants::CONFIG_KEY_ALLOWCONFIRMATIONEMAIL => $this->getAllowConfirmationEmail(),
+			Constants::CONFIG_KEY_CONFIRMATIONEMAILRATELIMIT => $this->getConfirmationEmailRateLimit(),
+			'isMailConfigured' => $this->isMailConfigured(),
 
 			// Additional, calculated information out of Config
 			'canCreateForms' => $this->canCreateForms()

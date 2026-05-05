@@ -194,6 +194,70 @@
 			</div>
 		</div>
 
+		<template v-if="appConfig.allowConfirmationEmail">
+			<NcCheckboxRadioSwitch
+				:modelValue="form.confirmationEmailEnabled"
+				:disabled="formArchived || locked"
+				type="switch"
+				@update:modelValue="onConfirmationEmailEnabledChange">
+				{{ t('forms', 'Send confirmation email to respondents') }}
+			</NcCheckboxRadioSwitch>
+			<div
+				v-show="form.confirmationEmailEnabled && !formArchived"
+				class="settings-div--indent confirmation-email">
+				<NcNoteCard
+					v-if="confirmationEmailErrorText"
+					:type="confirmationEmailNoteCardType"
+					:text="confirmationEmailErrorText" />
+				<div
+					v-if="emailQuestionCount > 0"
+					class="confirmation-email__recipient">
+					<label
+						for="confirmation-email-recipient"
+						class="confirmation-email__label">
+						{{ t('forms', 'Recipient field') }}
+					</label>
+					<NcSelect
+						inputId="confirmation-email-recipient"
+						:modelValue="selectedConfirmationEmailQuestionOption"
+						:disabled="locked || emailQuestionCount === 1"
+						:options="confirmationEmailQuestionOptions"
+						:placeholder="t('forms', 'Select an email field')"
+						class="confirmation-email__select"
+						label="label"
+						:searchable="false"
+						:clearable="false"
+						trackBy="id"
+						@update:modelValue="
+							onConfirmationEmailQuestionIdSelectionChange
+						" />
+				</div>
+				<p class="confirmation-email__placeholder-hint">
+					{{ t('forms', 'Available placeholders:') }}
+					<code>{formTitle}</code>, <code>{formDescription}</code>,
+					{{ t('forms', 'and field labels.') }}
+				</p>
+				<NcInputField
+					v-model="confirmationEmailSubject"
+					:disabled="locked || isConfirmationEmailConfigurationBlocked"
+					:maxlength="255"
+					:placeholder="
+						t('forms', 'Thank you for your {formTitle} submission')
+					"
+					:label="t('forms', 'Email subject')"
+					class="confirmation-email__input"
+					@blur="onConfirmationEmailSubjectChange" />
+				<NcTextArea
+					v-model="confirmationEmailBody"
+					:disabled="locked || isConfirmationEmailConfigurationBlocked"
+					:placeholder="emailBodyPlaceholder"
+					:label="t('forms', 'Email body')"
+					:maxlength="8192"
+					class="confirmation-email__textarea"
+					@blur="onConfirmationEmailBodyChange" />
+			</div>
+		</template>
+
 		<TransferOwnership
 			:locked="locked"
 			:isOwner="isCurrentUserOwner"
@@ -212,6 +276,8 @@ import NcDateTimePicker from '@nextcloud/vue/components/NcDateTimePicker'
 import NcIconSvgWrapper from '@nextcloud/vue/components/NcIconSvgWrapper'
 import NcInputField from '@nextcloud/vue/components/NcInputField'
 import NcNoteCard from '@nextcloud/vue/components/NcNoteCard'
+import NcSelect from '@nextcloud/vue/components/NcSelect'
+import NcTextArea from '@nextcloud/vue/components/NcTextArea'
 import TransferOwnership from './TransferOwnership.vue'
 import svgLockOpen from '../../../img/lock_open.svg?raw'
 import ShareTypes from '../../mixins/ShareTypes.js'
@@ -225,6 +291,8 @@ export default {
 		NcDateTimePicker,
 		NcIconSvgWrapper,
 		NcNoteCard,
+		NcSelect,
+		NcTextArea,
 		TransferOwnership,
 	},
 
@@ -262,10 +330,13 @@ export default {
 				parse: this.parseTimestampToDate,
 			},
 
+			appConfig: loadState('forms', 'appConfig'),
 			maxStringLengths: loadState('forms', 'maxStringLengths'),
 			/** If custom submission message is shown as input or rendered markdown */
 			editMessage: false,
 			svgLockOpen,
+			confirmationEmailSubject: this.form?.confirmationEmailSubject || '',
+			confirmationEmailBody: this.form?.confirmationEmailBody || '',
 		}
 	},
 
@@ -361,9 +432,159 @@ export default {
 		submissionMessageHTML() {
 			return this.$markdownit.render(this.form.submissionMessage || '')
 		},
+
+		emailBodyPlaceholder() {
+			return t(
+				'forms',
+				'Hello,\n\nThank you for submitting the form "{formTitle}".\n\nBest regards',
+			)
+		},
+
+		emailQuestionCount() {
+			return this.confirmationEmailQuestions.length
+		},
+
+		confirmationEmailQuestions() {
+			const questions = this.form?.questions || []
+			return questions.filter(
+				(question) =>
+					question.type === 'short'
+					&& question.extraSettings?.validationType === 'email',
+			)
+		},
+
+		selectedConfirmationEmailQuestion() {
+			const selectedQuestion = this.confirmationEmailQuestions.find(
+				(question) => question.id === this.form.confirmationEmailQuestionId,
+			)
+			if (selectedQuestion) {
+				return selectedQuestion
+			}
+
+			if (
+				this.form.confirmationEmailQuestionId === null
+				&& this.emailQuestionCount === 1
+			) {
+				return this.confirmationEmailQuestions[0]
+			}
+
+			return null
+		},
+
+		selectedConfirmationEmailQuestionId() {
+			return (
+				this.form.confirmationEmailQuestionId
+				?? this.selectedConfirmationEmailQuestion?.id
+				?? ''
+			)
+		},
+
+		confirmationEmailQuestionOptions() {
+			return this.confirmationEmailQuestions.map((question) => ({
+				id: question.id,
+				label: this.confirmationEmailQuestionLabel(question),
+			}))
+		},
+
+		selectedConfirmationEmailQuestionOption() {
+			return (
+				this.confirmationEmailQuestionOptions.find(
+					(question) =>
+						question.id === this.selectedConfirmationEmailQuestionId,
+				) || null
+			)
+		},
+
+		confirmationEmailErrorText() {
+			if (this.emailQuestionCount === 0) {
+				return t(
+					'forms',
+					'Add at least one email field before confirmation emails can be used.',
+				)
+			}
+
+			if (this.requiresConfirmationEmailQuestionIdSelection) {
+				return t(
+					'forms',
+					'Select which email field should receive confirmation emails before finishing this setup.',
+				)
+			}
+
+			return ''
+		},
+
+		confirmationEmailNoteCardType() {
+			if (this.requiresConfirmationEmailQuestionIdSelection) {
+				return 'warning'
+			}
+			return 'info'
+		},
+
+		requiresConfirmationEmailQuestionIdSelection() {
+			return (
+				this.emailQuestionCount > 1
+				&& !this.selectedConfirmationEmailQuestion
+			)
+		},
+
+		isConfirmationEmailConfigurationBlocked() {
+			return (
+				this.form.confirmationEmailEnabled
+				&& (this.emailQuestionCount === 0
+					|| this.requiresConfirmationEmailQuestionIdSelection)
+			)
+		},
+	},
+
+	watch: {
+		'form.confirmationEmailSubject': function (val) {
+			this.confirmationEmailSubject = val || ''
+		},
+
+		'form.confirmationEmailBody': function (val) {
+			this.confirmationEmailBody = val || ''
+		},
+
+		confirmationEmailQuestions: {
+			handler() {
+				const selectedRecipientId = this.form.confirmationEmailQuestionId
+				const hasValidSelectedRecipient =
+					selectedRecipientId !== null
+					&& this.confirmationEmailQuestions.some(
+						(question) => question.id === selectedRecipientId,
+					)
+
+				if (selectedRecipientId !== null && !hasValidSelectedRecipient) {
+					if (this.emailQuestionCount === 1) {
+						this.saveConfirmationEmailQuestionId(
+							this.confirmationEmailQuestions[0].id,
+						)
+					} else {
+						this.saveConfirmationEmailQuestionId(null)
+					}
+					return
+				}
+
+				if (
+					this.form.confirmationEmailEnabled
+					&& this.emailQuestionCount === 1
+					&& this.form.confirmationEmailQuestionId === null
+				) {
+					this.saveConfirmationEmailQuestionId(
+						this.confirmationEmailQuestions[0].id,
+					)
+				}
+			},
+
+			deep: true,
+		},
 	},
 
 	methods: {
+		confirmationEmailQuestionLabel(question) {
+			return question.text || t('forms', 'Untitled question')
+		},
+
 		/**
 		 * Save Form-Properties
 		 *
@@ -454,6 +675,57 @@ export default {
 			} else {
 				this.$emit('update:formProp', 'submissionMessage', '')
 			}
+		},
+
+		onConfirmationEmailEnabledChange(checked) {
+			if (
+				checked
+				&& this.form.confirmationEmailQuestionId === null
+				&& this.emailQuestionCount === 1
+			) {
+				this.saveConfirmationEmailQuestionId(
+					this.confirmationEmailQuestions[0].id,
+				)
+			}
+
+			this.$emit('update:formProp', 'confirmationEmailEnabled', checked)
+		},
+
+		onConfirmationEmailSubjectChange() {
+			this.$emit(
+				'update:formProp',
+				'confirmationEmailSubject',
+				this.confirmationEmailSubject,
+			)
+		},
+
+		onConfirmationEmailBodyChange() {
+			this.$emit(
+				'update:formProp',
+				'confirmationEmailBody',
+				this.confirmationEmailBody,
+			)
+		},
+
+		onConfirmationEmailQuestionIdSelectionChange(option) {
+			const questionId = option?.id ?? null
+			if (questionId === null) {
+				return
+			}
+
+			this.saveConfirmationEmailQuestionId(questionId)
+		},
+
+		saveConfirmationEmailQuestionId(selectedQuestionId) {
+			if (this.form.confirmationEmailQuestionId === selectedQuestionId) {
+				return
+			}
+
+			this.$emit(
+				'update:formProp',
+				'confirmationEmailQuestionId',
+				selectedQuestionId,
+			)
 		},
 
 		/**
@@ -548,6 +820,44 @@ export default {
 		&:hover {
 			border-color: var(--color-primary-element);
 		}
+	}
+}
+
+.confirmation-email {
+	&__recipient {
+		margin-bottom: calc(var(--default-grid-baseline) * 3);
+	}
+
+	&__label {
+		display: block;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		margin-bottom: var(--default-grid-baseline);
+		font-weight: 600;
+		color: var(--color-text-maxcontrast);
+	}
+
+	&__placeholder-hint {
+		color: var(--color-text-maxcontrast);
+		font-size: var(--font-size-small);
+		margin-top: calc(var(--default-grid-baseline) * 2);
+	}
+
+	&__select {
+		width: 100%;
+
+		// NcSelect sets min-width: 260px with two-class specificity; double
+		// our class to win the cascade without !important.
+		&#{&} {
+			min-width: 0;
+		}
+	}
+
+	&__input,
+	&__textarea {
+		width: 100%;
+		margin-top: calc(var(--default-grid-baseline) * 3);
 	}
 }
 </style>

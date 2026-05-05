@@ -149,6 +149,10 @@ class FormsMigrator implements IMigrator {
 				$form->setAllowEditSubmissions($formData['allowEditSubmissions']);
 				$form->setShowExpiration($formData['showExpiration']);
 				$form->setMaxSubmissions($formData['maxSubmissions'] ?? null);
+				$form->setConfirmationEmailEnabled($formData['confirmationEmailEnabled'] ?? false);
+				$form->setConfirmationEmailSubject($formData['confirmationEmailSubject'] ?? null);
+				$form->setConfirmationEmailBody($formData['confirmationEmailBody'] ?? null);
+				$form->setConfirmationEmailQuestionId(null); // Set to null initially, updated after questions are imported
 
 				$this->formMapper->insert($form);
 
@@ -175,6 +179,12 @@ class FormsMigrator implements IMigrator {
 
 						$this->optionMapper->insert($option);
 					}
+				}
+
+				if (($formData['confirmationEmailQuestionId'] ?? null) !== null
+					&& isset($questionIdMap[$formData['confirmationEmailQuestionId']])) {
+					$form->setConfirmationEmailQuestionId($questionIdMap[$formData['confirmationEmailQuestionId']]);
+					$this->formMapper->update($form);
 				}
 
 				foreach ($formData['submissions'] as $submissionData) {

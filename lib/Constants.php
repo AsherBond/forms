@@ -18,12 +18,16 @@ class Constants {
 	public const CONFIG_KEY_ALLOWSHOWTOALL = 'allowShowToAll';
 	public const CONFIG_KEY_CREATIONALLOWEDGROUPS = 'creationAllowedGroups';
 	public const CONFIG_KEY_RESTRICTCREATION = 'restrictCreation';
+	public const CONFIG_KEY_ALLOWCONFIRMATIONEMAIL = 'allowConfirmationEmail';
+	public const CONFIG_KEY_CONFIRMATIONEMAILRATELIMIT = 'confirmationEmailRateLimit';
 	public const CONFIG_KEYS = [
 		self::CONFIG_KEY_ALLOWPERMITALL,
 		self::CONFIG_KEY_ALLOWPUBLICLINK,
 		self::CONFIG_KEY_ALLOWSHOWTOALL,
 		self::CONFIG_KEY_CREATIONALLOWEDGROUPS,
-		self::CONFIG_KEY_RESTRICTCREATION
+		self::CONFIG_KEY_RESTRICTCREATION,
+		self::CONFIG_KEY_ALLOWCONFIRMATIONEMAIL,
+		self::CONFIG_KEY_CONFIRMATIONEMAILRATELIMIT,
 	];
 
 	/**
@@ -33,6 +37,8 @@ class Constants {
 		'formTitle' => 256,
 		'formDescription' => 8192,
 		'submissionMessage' => 2048,
+		'confirmationEmailSubject' => 255,
+		'confirmationEmailBody' => 8192,
 		'questionText' => 2048,
 		'questionDescription' => 4096,
 		'optionText' => 1024,
